@@ -1,4 +1,6 @@
 streamlit
 pandas
 numpy
+requests
+textblob
 openpyxl     # ← necessário para ler ficheiros .xlsx
