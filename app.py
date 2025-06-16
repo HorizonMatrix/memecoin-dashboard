@@ -1,3 +1,14 @@
+import streamlit as st
+import pandas as pd
+
+# Carregar dados do Excel
+@st.cache_data
+def carregar_dados():
+    df = pd.read_excel("top100_memecoins_ecsi.xlsx")  # Substituir pelo nome correto se necessário
+    return df
+
+df = carregar_dados()
+
 # ========== DASHBOARD INTERATIVO (2 PÁGINAS) ==========
 st.set_page_config(page_title="Memecoin Dashboard E-CSI", layout="wide")
 
