@@ -69,21 +69,33 @@ if pagina == "Dashboard":
     st.pyplot(fig)
 
 elif pagina == "Detalhe do Token":
-    st.title("🔎 Detalhe do Token – Top 100")
+    st.title("🔎 Detalhes do Token – Top 100")
     df["ident"] = df["name"] + " (" + df["token"] + ")"
     escolha = st.selectbox("Escolhe um token:", df["ident"].sort_values())
     sel_row = df[df["ident"] == escolha].iloc[0]
-    st.markdown(f"# Detalhe do Token: {sel_row['name']} ({sel_row['token']})")
-    st.write(f"**Rank CoinGecko:** {sel_row['rank']}")
-    st.write(f"**Market Cap:** ${sel_row['market_cap']:,}")
-    st.write(f"**E-CSI:** {sel_row['E-CSI']}")
-    st.write(f"**Faixa:** {sel_row['faixa_ecsi']}")
-    st.write(f"**Followers Twitter:** {int(sel_row['twitter_followers'])}")
-    st.write(f"**Engagement:** {sel_row['engagement']:.5f}")
-    st.write(f"**Sentimento:** {sel_row['sentiment_pct']:.2%}")
-    st.write(f"**Variação 24h:** {sel_row['price_change_24h%']:.2f}%")
-    st.write(f"**Variação 30d:** {sel_row['price_change_30d%']:.2f}%")
-    st.write(f"**ATH change:** {sel_row['ath_change_pct']:.2f}%")
-    if "twitter_handle" in sel_row and pd.notna(sel_row["twitter_handle"]) and sel_row["twitter_handle"]:
-        st.markdown(f"[Twitter Oficial](https://twitter.com/{sel_row['twitter_handle']})")
-    st.dataframe(sel_row)
+
+    st.markdown("""
+        <style>
+            .metric-big .stMetric {font-size: 32px !important;}
+        </style>
+    """, unsafe_allow_html=True)
+
+    col1, col2, col3, col4 = st.columns(4)
+    col1.metric("Token", sel_row['token'])
+    col2.metric("Rank CG", int(sel_row['rank']))
+    col3.metric("Market Cap", f"${sel_row['market_cap']/1e6:,.1f}M")
+    col4.metric("Followers", int(sel_row['twitter_followers']))
+
+    col5, col6, col7, col8 = st.columns(4)
+    col5.metric("E-CSI", sel_row['E-CSI'])
+    col6.metric("Faixa", sel_row['faixa_ecsi'])
+    col7.metric("Engagement", f"{sel_row['engagement']:.5f}")
+    col8.metric("Sentiment", f"{sel_row['sentiment_pct']*100:.1f}%")
+
+    with st.expander("Mais detalhes e histórico"):
+        st.write(f"**Variação 24h:** {sel_row['price_change_24h%']:.2f}%")
+        st.write(f"**Variação 30d:** {sel_row['price_change_30d%']:.2f}%")
+        st.write(f"**ATH change:** {sel_row['ath_change_pct']:.2f}%")
+        if "twitter_handle" in sel_row and pd.notna(sel_row["twitter_handle"]) and sel_row["twitter_handle"]:
+            st.markdown(f"[Twitter Oficial](https://twitter.com/{sel_row['twitter_handle']})")
+        st.dataframe(sel_row)
