@@ -1,73 +1,109 @@
-# app.py – Dashboard Top 100 Memecoins | E‑CSI
-# ============================================================
-# Executar:  streamlit run app.py
-# Dependências: streamlit  •  pandas  •  numpy
+# -*- coding: utf-8 -*-
+"""
+Dashboard Interativo – Top 100 Memecoins (E-CSI + Social)
+=========================================================
+Mostra ranking, filtros, e análise social (followers, engagement, sentimento)
 
+Requisitos: streamlit • pandas • numpy • matplotlib
+Ficheiro: top100_memecoins_ecsi.xlsx (export do script)
+"""
 import streamlit as st
 import pandas as pd
 import numpy as np
+import matplotlib.pyplot as plt
 
-FILE_PATH = "top100_memecoins_ecsi.xlsx"   # <- Excel gerado pelo script Python
+st.set_page_config(
+    page_title="Dashboard Memecoins E-CSI",
+    layout="wide",
+)
+st.title("💸 Dashboard – Top 100 Memecoins | E-CSI + Social")
 
-# ---------------------------------------------------------------------
-@st.cache_data(show_spinner="📥 A carregar Top 100 memecoins…")
-def load_data(path: str = FILE_PATH) -> pd.DataFrame:
-    df = pd.read_excel(path)
-    # Converter campos numéricos seguros
-    for col in ["E-CSI", "market_cap", "twitter_followers"]:
-        df[col] = pd.to_numeric(df[col], errors="coerce")
+@st.cache_data
+def carregar_dados():
+    df = pd.read_excel("top100_memecoins_ecsi.xlsx")
+    # Corrigir NaN sociais
+    df["twitter_followers"] = df["twitter_followers"].fillna(0).astype(int)
+    df["engagement"] = df["engagement"].fillna(0)
+    df["sentiment_pct"] = df["sentiment_pct"].fillna(0)
     return df
 
-try:
-    df = load_data()
-except FileNotFoundError:
-    st.error("❌ Ficheiro top100_memecoins_ecsi.xlsx não encontrado. Corre o script gerador primeiro ou coloca-o na pasta do app.")
-    st.stop()
+df = carregar_dados()
 
-# ---------------------------------------------------------------------
-# Sidebar – filtros
+# ---- Filtros laterais ----
 st.sidebar.header("Filtros de Pesquisa")
-faixas = ["Fraca", "Moderada", "Forte", "Muito forte", "Extremamente forte"]
-sel_faixa = st.sidebar.multiselect("Faixa E‑CSI", options=faixas, default=faixas)
+faixas = st.sidebar.multiselect(
+    "Faixa E-CSI",
+    options=list(df["faixa_ecsi"].unique()),
+    default=list(df["faixa_ecsi"].unique()),
+)
+cap_min, cap_max = st.sidebar.slider(
+    "Market Cap (milhões USD)",
+    int(df.market_cap.min()//1_000_000),
+    int(df.market_cap.max()//1_000_000),
+    (int(df.market_cap.min()//1_000_000), int(df.market_cap.max()//1_000_000)),
+)
+eng_min, eng_max = st.sidebar.slider(
+    "Engagement",
+    float(df.engagement.min()), float(df.engagement.max()),
+    (float(df.engagement.min()), float(df.engagement.max())),
+)
+sent_min, sent_max = st.sidebar.slider(
+    "Sentiment (%)",
+    float(df.sentiment_pct.min()), float(df.sentiment_pct.max()),
+    (float(df.sentiment_pct.min()), float(df.sentiment_pct.max())),
+)
 
-min_cap_m = int(df["market_cap"].min() // 1_000_000)
-max_cap_m = int(df["market_cap"].max() // 1_000_000)
-cap_range = st.sidebar.slider("Market Cap (milhões USD)", min_cap_m, max_cap_m, (min_cap_m, max_cap_m))
+# ---- Aplicar filtros ----
+df_filt = df[
+    df["faixa_ecsi"].isin(faixas)
+    & (df.market_cap >= cap_min*1_000_000)
+    & (df.market_cap <= cap_max*1_000_000)
+    & (df.engagement >= eng_min)
+    & (df.engagement <= eng_max)
+    & (df.sentiment_pct >= sent_min)
+    & (df.sentiment_pct <= sent_max)
+]
 
-# Aplicar filtros
-df_f = df[df["faixa_ecsi"].isin(sel_faixa)]
-df_f = df_f[(df_f["market_cap"] / 1_000_000).between(*cap_range)]
+# ---- KPIs topo ----
+col1, col2, col3 = st.columns(3)
+col1.metric("Tokens", len(df_filt))
+col2.metric("E-CSI médio", round(df_filt["E-CSI"].mean(),2))
+col3.metric("Cap. Total", f"${df_filt['market_cap'].sum()/1e9:,.2f} B")
 
-# ---------------------------------------------------------------------
-# KPIs principais
-st.title("🤑 Dashboard – Top 100 Memecoins | E‑CSI")
-st.caption("Dados CoinGecko (plano demo) – Junho 2025 • Enhanced Crypto Strength Index")
-
-c1, c2, c3 = st.columns(3)
-c1.metric("Tokens", len(df_f))
-c2.metric("E‑CSI médio", f"{df_f['E-CSI'].mean():.2f}")
-c3.metric("Cap. Total", f"${df_f['market_cap'].sum()/1_000_000_000:.2f} B")
-
-st.divider()
-
-# ---------------------------------------------------------------------
-# Ranking por E‑CSI
-st.subheader("Ranking (E‑CSI)")
+# ---- Ranking principal ----
+st.subheader("Ranking (E-CSI)")
+cols = [
+    "rank", "token", "name", "E-CSI", "faixa_ecsi", "market_cap",
+    "twitter_followers", "engagement", "sentiment_pct"
+]
 st.dataframe(
-    df_f.sort_values("E-CSI", ascending=False)[[
-        "rank", "token", "name", "E-CSI", "faixa_ecsi", "market_cap", "twitter_followers"
-    ]].reset_index(drop=True),
-    use_container_width=True,
+    df_filt[cols].sort_values("E-CSI", ascending=False).reset_index(drop=True),
+    use_container_width=True
 )
 
-# ---------------------------------------------------------------------
-# Gráfico – Followers vs E‑CSI
-st.subheader("Followers Twitter × E‑CSI")
-st.scatter_chart(
-    df_f.dropna(subset=["twitter_followers", "E-CSI"]),
-    x="twitter_followers",
-    y="E-CSI",
-)
+# ---- Gráfico Followers × E-CSI ----
+st.subheader("Followers Twitter × E-CSI")
+fig, ax = plt.subplots()
+ax.scatter(df_filt["twitter_followers"], df_filt["E-CSI"], alpha=0.8)
+ax.set_xlabel("Followers (Twitter)")
+ax.set_ylabel("E-CSI")
+ax.grid(True, ls=":", alpha=0.4)
+st.pyplot(fig)
 
-# Rodapé
-st.caption("© 2025 • Fórmula E‑CSI = 0.25·Volume + 0.25·Performance + 0.15·ATH + 0.15·Stability + 0.20·Social")
+# ---- Detalhes por token ----
+st.subheader("🔎 Detalhes do Token – Top 100")
+opt_token = st.selectbox(
+    "Escolhe um token:",
+    df["name"] + " (" + df["token"] + ")",
+)
+sel_row = df[df["name"] + " (" + df["token"] + ")" == opt_token].iloc[0]
+
+colA, colB, colC, colD = st.columns(4)
+colA.metric("Token", sel_row["token"])
+colB.metric("Rank CG", sel_row["rank"])
+colC.metric("Market Cap", f"${sel_row['market_cap']/1e6:,.1f}M")
+colD.metric("Followers", int(sel_row["twitter_followers"]))
+colA.metric("E-CSI", sel_row["E-CSI"])
+colB.metric("Faixa", sel_row["faixa_ecsi"])
+colC.metric("Engagement", round(sel_row["engagement"],4))
+colD.metric("Sentiment", f"{sel_row['sentiment_pct']*100:.1f}%")
